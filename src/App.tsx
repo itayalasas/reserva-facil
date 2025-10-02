@@ -16,6 +16,7 @@ import { BookingProcess } from './components/BookingProcess';
 import { MyBookings } from './components/MyBookings';
 import { BusinessBookings } from './components/BusinessBookings';
 import { AuthCallback } from './components/AuthCallback';
+import { MaintenancePage } from './components/MaintenancePage';
 import { Business } from './types';
 
 // Component interno para manejar la lógica de la app
