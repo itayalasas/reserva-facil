@@ -1,211 +1,275 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useSearchParams, useParams } from 'react-router-dom';
-import { useAuth } from './hooks/useAuth';
-import AuthPage from './components/auth/AuthPage';
-import PublicAuthRouter from './components/auth/PublicAuthRouter';
-import Sidebar from './components/layout/Sidebar';
-import Header from './components/layout/Header';
-import DashboardOverview from './components/dashboard/DashboardOverview';
-import ApplicationsList from './components/applications/ApplicationsList';
-import ApiDocumentation from './components/documentation/ApiDocumentation';
-import BrandingManager from './components/branding/BrandingManager';
-import UsersManager from './components/users/UsersManager';
-import EnvironmentsManager from './components/environments/EnvironmentsManager';
-import ApiKeysManager from './components/apikeys/ApiKeysManager';
-import RolesManager from './components/roles/RolesManager';
-import LogsViewer from './components/logs/LogsViewer';
-import AuthenticationSettings from './components/authentication/AuthenticationSettings';
-import SettingsPage from './components/settings/SettingsPage';
-import SubscriptionManager from './components/subscription/SubscriptionManager';
+import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
+import { Notification, useNotification } from './components/Notification';
+import { Navbar } from './components/Navbar';
+import { HomePage } from './components/HomePage';
+import { AuthForms } from './components/AuthForms';
+import { BrowseServices } from './components/BrowseServices';
+import { BusinessDashboard } from './components/BusinessDashboard';
+import { BusinessSetup } from './components/BusinessSetup';
+import { BusinessServices } from './components/BusinessServices';
+import { BusinessScheduleComponent } from './components/BusinessSchedule';
+import { BusinessSettings } from './components/BusinessSettings';
+import { BusinessDetail } from './components/BusinessDetail';
+import { BookingProcess } from './components/BookingProcess';
+import { MyBookings } from './components/MyBookings';
+import { BusinessBookings } from './components/BusinessBookings';
+import { AuthCallback } from './components/AuthCallback';
+import { Business } from './types';
 
-// Component for handling public auth routes
-function PublicAuthRoute() {
-  const { action } = useParams<{ action: string }>();
-  const [searchParams] = useSearchParams();
-  
-  const appId = searchParams.get('app_id');
-  
-  if (!appId) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600">app_id parameter is required</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Map auth actions to form types
-  const actionTypeMap: Record<string, string> = {
-    'login': 'login',
-    'register': 'register',
-    'reset-password': 'reset-password',
-    'verify-email': 'verify-email'
-  };
-  
-  const formType = actionTypeMap[action || 'login'] || 'login';
-  
-  return (
-    <PublicAuthRouter 
-      appId={appId}
-      formType={formType as 'login' | 'register' | 'reset-password'}
-    />
-  );
-}
+// Component interno para manejar la lógica de la app
+const AppContent = () => {
+  const { isAuthenticated } = useAuth();
+  const { notification, showSuccess, showError, hideNotification } = useNotification();
+  const [currentView, setCurrentView] = useState('home');
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentProcessed, setPaymentProcessed] = useState(false);
 
-function MainApp() {
-  const { user, loading } = useAuth();
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [currentEnvironment, setCurrentEnvironment] = useState('development');
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
-
-  // Check if we're in public auth mode
-  const appId = searchParams.get('app_id');
-  const formType = searchParams.get('form') || 'login';
-  const isPublicAuth = !!appId;
-
-  // Escuchar eventos de cambio de sección desde otros componentes
+  // Detectar callback de pago y procesar reserva
   useEffect(() => {
-    const handleSectionChange = (event: CustomEvent) => {
-      const { section, appId } = event.detail;
-      setActiveSection(section);
-      
-      // Guardar el appId seleccionado para que los componentes lo usen
-      if (appId) {
-        sessionStorage.setItem('selectedAppId', appId);
-      }
-    };
-
-    window.addEventListener('changeSectionWithApp', handleSectionChange as EventListener);
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const paymentId = urlParams.get('payment_id');
+    const status = urlParams.get('status');
+    const externalReference = urlParams.get('external_reference');
     
-    return () => {
-      window.removeEventListener('changeSectionWithApp', handleSectionChange as EventListener);
-    };
+    // Procesar callback de pago si existe y el usuario está autenticado
+    if (paymentStatus && externalReference && isAuthenticated && !paymentProcessed) {
+      console.log('Processing payment callback:', {
+        paymentStatus,
+        paymentId,
+        status,
+        externalReference
+      });
+      
+      setProcessingPayment(true);
+      processPaymentCallback(paymentStatus, externalReference, paymentId);
+    }
+    
+    // También procesar si viene directamente con status=approved de Mercado Pago
+    if (!paymentStatus && status === 'approved' && externalReference && isAuthenticated && !paymentProcessed) {
+      console.log('Processing Mercado Pago direct callback:', {
+        status,
+        externalReference,
+        paymentId
+      });
+      
+      setProcessingPayment(true);
+      processPaymentCallback('success', externalReference, paymentId);
+    }
+  }, [isAuthenticated, paymentProcessed]);
+
+  const processPaymentCallback = async (paymentStatus: string, externalReference: string, paymentId?: string) => {
+    try {
+      console.log('Processing payment callback:', { paymentStatus, externalReference, paymentId });
+      
+      // Buscar la reserva usando el external_reference en las notas
+      const timestampMatch = externalReference.match(/booking_(\d+)/);
+      if (!timestampMatch) {
+        console.error('Invalid external_reference format:', externalReference);
+        throw new Error('No se pudo obtener el timestamp de la reserva del external_reference');
+      }
+      
+      const timestamp = timestampMatch[1];
+      console.log('Extracted timestamp:', timestamp);
+
+      // Buscar la reserva que contiene este timestamp en las notas
+      const { data: bookings, error: searchError } = await supabase
+        .from('bookings')
+        .select('id, notes, status')
+        .ilike('notes', `%${timestamp}%`)
+        .in('status', ['pending', 'confirmed']) // Permitir ambos estados
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (searchError) throw searchError;
+      
+      if (!bookings || bookings.length === 0) {
+        console.error('No booking found with timestamp:', timestamp);
+        // Buscar sin filtro de estado como fallback
+        const { data: fallbackBookings, error: fallbackError } = await supabase
+          .from('bookings')
+          .select('id, notes, status')
+          .ilike('notes', `%${timestamp}%`)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (fallbackError || !fallbackBookings || fallbackBookings.length === 0) {
+          throw new Error('No se encontró la reserva correspondiente');
+        }
+        
+        bookings.push(...fallbackBookings);
+      }
+
+      const booking = bookings[0];
+      console.log('Found booking:', booking);
+
+      // Actualizar estado de la reserva
+      const newStatus = paymentStatus === 'success' ? 'confirmed' : 
+                       paymentStatus === 'pending' ? 'pending' : 'cancelled';
+      
+      console.log('Updating booking status to:', newStatus);
+      
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: newStatus,
+          notes: `${booking.notes} - Pago: ${paymentStatus} - Payment ID: ${paymentId || 'N/A'} - Timestamp: ${timestamp}`
+        })
+        .eq('id', booking.id);
+
+      if (error) throw error;
+
+      console.log('Booking updated successfully:', { bookingId: booking.id, status: newStatus, paymentId });
+      
+      // Limpiar URL completamente
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      
+      // Marcar como procesado
+      setPaymentProcessed(true);
+      setProcessingPayment(false);
+      
+      // Mostrar mensaje de éxito
+      showSuccess(
+        '¡Pago procesado exitosamente!',
+        newStatus === 'confirmed' 
+          ? 'Tu reserva ha sido confirmada y aparecerá en "Mis Reservas".'
+          : 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.'
+      );
+      
+      // Redirigir después de un momento
+      setTimeout(() => {
+        setCurrentView('my-bookings');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error processing payment callback:', error);
+      setProcessingPayment(false);
+      
+      // En caso de error, mostrar mensaje y redirigir
+      showError(
+        'Error procesando el pago',
+        `No se pudo actualizar la reserva: ${error.message || 'Error desconocido'}`
+      );
+      
+      // Limpiar URL incluso si hay error
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      
+      setTimeout(() => {
+        setCurrentView('my-bookings');
+      }, 3000);
+    }
+  };
+
+  // Detectar rutas especiales
+  useEffect(() => {
+    const path = window.location.pathname;
+    
+    console.log('App - Current path:', path);
+    
+    if (path === '/auth/callback') {
+      setCurrentView('auth-callback');
+    } else if (path === '/maintenance') {
+      setCurrentView('maintenance');
+    }
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  // Show public auth forms if app_id parameter is present
-  if (isPublicAuth) {
-    return (
-      <PublicAuthRouter 
-        appId={appId}
-        formType={formType as 'login' | 'register' | 'reset-password'}
-      />
-    );
-  }
-
-  // Show login page if not authenticated and not on public route
-  if (!user) {
-    return <AuthPage onAuthSuccess={() => window.location.reload()} />;
-  }
-
-  const getSectionTitle = (section: string) => {
-    switch (section) {
-      case 'dashboard': return 'Dashboard';
-      case 'applications': return 'Aplicaciones';
-      case 'users': return 'Gestión de Usuarios';
-      case 'roles': return 'Roles y Permisos';
-      case 'authentication': return 'Autenticación';
-      case 'branding': return 'Gestión de Branding';
-      case 'environments': return 'Ambientes';
-      case 'api-keys': return 'API Keys';
-      case 'logs': return 'Logs de Actividad';
-      case 'documentation': return 'Documentación';
-      case 'settings': return 'Configuración';
-      default: return 'Dashboard';
+  const renderCurrentView = () => {
+    // Si está procesando pago, mostrar mensaje de procesamiento
+    if (processingPayment) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              ¡Pago Exitoso!
+            </h2>
+            <p className="text-gray-600">
+              Confirmando tu reserva y redirigiendo a Mis Reservas...
+            </p>
+          </div>
+        </div>
+      );
     }
-  };
 
-  const getSectionSubtitle = (section: string) => {
-    switch (section) {
-      case 'dashboard': return 'Vista general de tu sistema de autenticación';
-      case 'applications': return 'Gestiona todas tus aplicaciones registradas';
-      case 'users': return 'Administra usuarios y permisos por aplicación';
-      case 'roles': return 'Configura roles y permisos personalizados';
-      case 'authentication': return 'Configura métodos de autenticación';
-      case 'branding': return 'Personaliza la apariencia de tus formularios';
-      case 'environments': return 'Gestiona ambientes de desarrollo, testing y producción';
-      case 'api-keys': return 'Administra claves de API para integración';
-      case 'logs': return 'Monitorea actividad y eventos del sistema';
-      case 'documentation': return 'Guías y referencias de API';
-      case 'settings': return 'Configuración general del sistema';
-      default: return '';
-    }
-  };
-
-  const renderContent = () => {
-    switch (activeSection) {
-      case 'dashboard':
-        return <DashboardOverview />;
-      case 'applications':
-        return <ApplicationsList />;
-      case 'subscription':
-        return <SubscriptionManager />;
-      case 'users':
-        return <UsersManager />;
-      case 'roles':
-        return <RolesManager />;
-      case 'authentication':
-        return <AuthenticationSettings />;
-      case 'branding':
-        return <BrandingManager />;
-      case 'environments':
-        return <EnvironmentsManager />;
-      case 'api-keys':
-        return <ApiKeysManager />;
-      case 'logs':
-        return <LogsViewer />;
-      case 'documentation':
-        return <ApiDocumentation />;
-      case 'settings':
-        return <SettingsPage />;
-      case 'subscription':
-        return <SubscriptionManager />;
+    switch (currentView) {
+      case 'home':
+        return <HomePage setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+      case 'login':
+        return <AuthForms view="login" setCurrentView={setCurrentView} />;
+      case 'register':
+        return <AuthForms view="register" setCurrentView={setCurrentView} />;
+      case 'browse':
+        return <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+      case 'business-dashboard':
+        return <BusinessDashboard setCurrentView={setCurrentView} />;
+      case 'business-setup':
+        return <BusinessSetup setCurrentView={setCurrentView} />;
+      case 'business-services':
+        return <BusinessServices setCurrentView={setCurrentView} />;
+      case 'business-schedule':
+        return <BusinessScheduleComponent setCurrentView={setCurrentView} />;
+      case 'business-settings':
+        return <BusinessSettings setCurrentView={setCurrentView} />;
+      case 'business-detail':
+        return selectedBusiness ? (
+          <BusinessDetail 
+            business={selectedBusiness} 
+            setCurrentView={setCurrentView}
+            setSelectedBusiness={setSelectedBusiness}
+          />
+        ) : <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+      case 'booking-process':
+        return selectedBusiness ? (
+          <BookingProcess 
+            business={selectedBusiness} 
+            setCurrentView={setCurrentView}
+          />
+        ) : <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+      case 'my-bookings':
+        return <MyBookings setCurrentView={setCurrentView} />;
+      case 'business-bookings':
+        return <BusinessBookings setCurrentView={setCurrentView} />;
+      case 'auth-callback':
+        return <AuthCallback setCurrentView={setCurrentView} />;
+      case 'maintenance':
+        return <MaintenancePage setCurrentView={setCurrentView} />;
       default:
-        return <DashboardOverview />;
+        return <HomePage setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
     }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <Sidebar 
-        activeSection={activeSection} 
-        onSectionChange={setActiveSection} 
-      />
+    <div className="min-h-screen bg-white">
+      {currentView !== 'home' && !processingPayment && (
+        <Navbar currentView={currentView} setCurrentView={setCurrentView} />
+      )}
+      {renderCurrentView()}
       
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title={getSectionTitle(activeSection)} 
-          subtitle={getSectionSubtitle(activeSection)}
+      {/* Global Notification */}
+      {notification && (
+        <Notification
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          isVisible={notification.isVisible}
+          onClose={hideNotification}
         />
-        
-        <main className="flex-1 overflow-y-auto p-6">
-          {renderContent()}
-        </main>
-      </div>
+      )}
     </div>
   );
-}
+};
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/:action" element={<PublicAuthRoute />} />
-        <Route path="/*" element={<MainApp />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
