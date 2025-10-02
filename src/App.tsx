@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Notification, useNotification } from './components/Notification';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './components/HomePage';
