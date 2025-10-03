@@ -33,6 +33,7 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [bookingTimestamp, setBookingTimestamp] = useState<string>('');
 
   const steps = [
     { number: 1, title: 'Datos del Cliente', icon: User },
@@ -274,7 +275,7 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
     setProcessing(true);
     try {
       const scheduledAt = new Date(`${selectedDate}T${selectedTime}:00`);
-      
+
       // Get the correct client_id based on authentication type
       const clientId = isExternalAuth && externalUser ? externalUser.user.id : user?.id;
 
@@ -283,9 +284,9 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
       }
 
       // Crear un timestamp único para identificar esta reserva
-      const bookingTimestamp = Date.now().toString();
-      
-      console.log('Creating booking with auto-generated UUID');
+      const timestamp = Date.now().toString();
+
+      console.log('Creating booking with timestamp:', timestamp);
 
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -294,8 +295,8 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
           client_id: clientId,
           business_id: business.id,
           scheduled_at: scheduledAt.toISOString(),
-          status: 'pending', // Will be updated to 'confirmed' after successful payment
-          notes: `Cliente: ${clientInfo.name}, Email: ${clientInfo.email}, Teléfono: ${clientInfo.phone} - Timestamp: ${bookingTimestamp}`
+          status: 'pending',
+          notes: `Cliente: ${clientInfo.name}, Email: ${clientInfo.email}, Teléfono: ${clientInfo.phone} - Timestamp: ${timestamp}`
         }])
         .select()
         .single();
@@ -303,11 +304,12 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
       if (error) throw error;
 
       console.log('Booking created before payment:', bookingData);
-      
-      // Store the timestamp for later reference in payment
-      localStorage.setItem('booking_timestamp', bookingTimestamp);
-      
-      return bookingTimestamp;
+      console.log('Booking timestamp to use for payment:', timestamp);
+
+      // Store the timestamp in component state for payment
+      setBookingTimestamp(timestamp);
+
+      return timestamp;
     } catch (error) {
       console.error('Error creating booking before payment:', error);
       showError('Error al crear la reserva', 'Por favor, intenta nuevamente.');
@@ -391,8 +393,9 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
     // Check if payment is required and configured
     if (paymentConfig && paymentConfig.is_active) {
       // Create booking first, then redirect to payment
-      const bookingId = await createBookingBeforePayment();
-      if (bookingId) {
+      const timestamp = await createBookingBeforePayment();
+      if (timestamp) {
+        console.log('Booking created with timestamp:', timestamp);
         setShowPayment(true);
       }
     } else {
@@ -798,7 +801,7 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
                     Procesar Pago
                   </h2>
                   
-                  {paymentConfig && (
+                  {paymentConfig && bookingTimestamp && (
                     <PaymentForm
                       amount={selectedService?.price || 0}
                       description={`${selectedService?.name} - ${business.name}`}
@@ -806,7 +809,7 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
                       payerName={clientInfo.name}
                       publicKey={paymentConfig.mercado_pago_public_key}
                       accessToken={paymentConfig.mercado_pago_access_token}
-                      externalReference={`booking_${Date.now()}`}
+                      externalReference={`booking_${bookingTimestamp}`}
                       onPaymentSuccess={handlePaymentSuccess}
                       onPaymentError={handlePaymentError}
                     />
