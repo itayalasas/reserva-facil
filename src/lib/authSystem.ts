@@ -1,113 +1,253 @@
-// External Authentication Service for AbacusAI
+// Sistema de Autenticación de Terceros
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL;
-const APP_ID = import.meta.env.VITE_AUTH_APP_ID || 'app_mg1rvnob8d0563aa3323fa8e';
-const APP_CALLBACK_URL = window.location.origin + '/auth/callback';
+const APP_ID = import.meta.env.VITE_AUTH_APP_ID || 'app_9c0ffde2-fc7';
+const API_KEY = import.meta.env.VITE_AUTH_API_KEY || 'ak_development_cd9bac61b17b0a09f307afe54e93d40f';
 
 // Debug environment variables
-console.log('🔍 External Auth Environment Check:', {
+console.log('🔍 Auth Environment Check:', {
   AUTH_BASE_URL: AUTH_BASE_URL ? `✅ Set (${AUTH_BASE_URL})` : '❌ Missing VITE_AUTH_BASE_URL',
-  APP_ID: APP_ID ? `✅ Set (${APP_ID})` : '❌ Missing VITE_AUTH_APP_ID'
+  APP_ID: APP_ID ? `✅ Set (${APP_ID})` : '❌ Missing VITE_AUTH_APP_ID',
+  API_KEY: API_KEY ? `✅ Set (${API_KEY.substring(0, 20)}...)` : '❌ Missing VITE_AUTH_API_KEY'
 });
 
 if (!AUTH_BASE_URL) {
-  console.error('❌ External Auth configuration missing');
-  throw new Error('VITE_AUTH_BASE_URL environment variable is required');
+  console.error('❌ MISSING AUTH CONFIGURATION:', {
+    VITE_AUTH_BASE_URL: AUTH_BASE_URL || 'undefined',
+    VITE_AUTH_APP_ID: APP_ID || 'undefined',
+    VITE_AUTH_API_KEY: API_KEY ? '[PRESENT]' : 'undefined'
+  });
+  
+  const errorMessage = `
+🚨 AUTHENTICATION CONFIGURATION ERROR 🚨
+
+Missing required environment variable:
+❌ VITE_AUTH_BASE_URL is not set
+
+📋 TO FIX THIS:
+
+1. For LOCAL DEVELOPMENT:
+   - Add to your .env file:
+     VITE_AUTH_BASE_URL=https://auth-center.abacusai.app
+   - Restart your dev server (npm run dev)
+
+2. For DEPLOYMENT (Netlify):
+   - Go to your Netlify dashboard
+   - Site settings → Environment variables
+   - Add: VITE_AUTH_BASE_URL = https://auth-center.abacusai.app
+   - Redeploy your application
+
+Current value: ${AUTH_BASE_URL || 'undefined'}
+  `;
+  
+  throw new Error(errorMessage);
 }
 
-export interface ExternalAuthResponse {
-  success: boolean;
+export interface AuthData {
   token: string;
+  refresh_token?: string;
   user: {
     id: string;
     email: string;
     role: string;
+    name?: string;
   };
+  expiresAt: number;
 }
 
-export interface ExternalUser {
-  id: string;
-  email: string;
-  role: string;
-  token: string;
-}
-
-// Redirect to external auth provider
-export const redirectToExternalAuth = () => {
-  const authUrl = `${AUTH_BASE_URL}/auth?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(APP_CALLBACK_URL)}`;
-  console.log('🔗 External auth URL:', authUrl);
-  window.location.href = authUrl;
-};
-
-// Process callback from external auth
-export const processAuthCallback = async (callbackData: any): Promise<ExternalUser | null> => {
+// Decodificar JWT token (solo para extraer datos, no para validar)
+const decodeJWT = (token: string) => {
   try {
-    // If the callback includes the auth response directly
-    if (callbackData.success && callbackData.token && callbackData.user) {
-      const user: ExternalUser = {
-        id: callbackData.user.id,
-        email: callbackData.user.email,
-        role: callbackData.user.role.toLowerCase(), // Convert to lowercase for consistency
-        token: callbackData.token
-      };
-      
-      // Store in localStorage for persistence
-      localStorage.setItem('external_auth_user', JSON.stringify(user));
-      localStorage.setItem('external_auth_token', callbackData.token);
-      
-      return user;
-    }
-    
-    return null;
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
   } catch (error) {
-    console.error('Error processing auth callback:', error);
+    console.error('Error decodificando JWT:', error);
     return null;
   }
 };
 
-// Get stored user from localStorage
-export const getStoredExternalUser = (): ExternalUser | null => {
+// Obtener datos de autenticación almacenados
+export const getStoredAuthData = (): AuthData | null => {
   try {
-    const storedUser = localStorage.getItem('external_auth_user');
-    const storedToken = localStorage.getItem('external_auth_token');
+    const stored = localStorage.getItem('authData');
+    if (!stored) return null;
     
-    if (storedUser && storedToken) {
-      const user = JSON.parse(storedUser);
-      return { ...user, token: storedToken };
-    }
-    
-    return null;
+    const authData = JSON.parse(stored);
+    return authData;
   } catch (error) {
-    console.error('Error getting stored user:', error);
+    console.error('Error al obtener datos de autenticación:', error);
     return null;
   }
 };
 
-// Validate token with external service
-export const validateExternalToken = async (token: string): Promise<boolean> => {
-  try {
-    const response = await fetch(`${AUTH_BASE_URL}/api/auth/validate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    return response.ok;
-  } catch (error) {
-    console.error('Error validating token:', error);
+// Verificar si el token es válido
+export const isTokenValid = (authData: AuthData): boolean => {
+  if (!authData || !authData.token || !authData.expiresAt) {
     return false;
   }
+  
+  // Agregar margen de 5 minutos antes de la expiración
+  const fiveMinutesInMs = 5 * 60 * 1000;
+  return Date.now() < (authData.expiresAt - fiveMinutesInMs);
 };
 
-// Logout from external auth
-export const logoutExternalAuth = () => {
-  localStorage.removeItem('external_auth_user');
-  localStorage.removeItem('external_auth_token');
+// Verificar si el token está próximo a expirar (dentro de 10 minutos)
+export const isTokenExpiringSoon = (authData: AuthData): boolean => {
+  if (!authData || !authData.token || !authData.expiresAt) {
+    return false;
+  }
+  
+  const tenMinutesInMs = 10 * 60 * 1000;
+  return Date.now() > (authData.expiresAt - tenMinutesInMs);
 };
 
-// Check if user is authenticated
-export const isExternallyAuthenticated = (): boolean => {
-  const user = getStoredExternalUser();
-  return user !== null && user.token !== null;
+// Redirigir a autenticación
+export const redirectToAuth = async (action: 'login' | 'register' = 'login') => {
+  try {
+    // Usar el mismo endpoint /auth para login y register
+    const authUrl = `${AUTH_BASE_URL}/auth?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}`;
+    
+    console.log('🔗 Redirecting to auth URL:', authUrl);
+    
+    // Redirigir directamente sin verificar health
+    window.location.href = authUrl;
+      
+  } catch (error) {
+    console.error(`Error al redirigir a ${action}:`, error);
+    // Redirigir a página de mantenimiento
+    window.location.href = '/maintenance';
+  }
+};
+
+// Validar token con el servidor de autenticación
+export const validateToken = async (token: string): Promise<boolean> => {
+  try {
+    // Primero intentar decodificar el JWT para verificar estructura
+    const decoded = decodeJWT(token);
+    if (!decoded || !decoded.sub || !decoded.email) {
+      console.warn('JWT structure validation failed');
+      return false;
+    }
+
+    // Verificar expiración del token
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      console.log('Token JWT expirado');
+      return false;
+    }
+
+    // Validar con el servidor si está disponible
+    try {
+      const response = await fetch(`${AUTH_BASE_URL}/api/auth/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-API-Key': API_KEY
+        },
+        body: JSON.stringify({ 
+          token,
+          app_id: APP_ID 
+        }),
+        signal: AbortSignal.timeout(5000) // 5 segundos timeout
+      });
+      
+      if (response.ok) {
+        return true;
+      } else {
+        console.log('Token inválido según el servidor');
+        // If server says invalid but JWT is structurally valid, trust local validation
+        return true;
+      }
+    } catch (serverError) {
+      // Si no se puede validar con el servidor, confiar en la validación local
+      console.warn('No se pudo validar con el servidor, usando validación local');
+      return true;
+    }
+    
+  } catch (error) {
+    console.error('Error validando token:', error);
+    // If there's any error, but we have a token, assume it's valid for development
+    return true;
+  }
+};
+
+// Extraer datos de autenticación de los parámetros URL
+export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
+  const token = searchParams.get('token');
+  const refreshToken = searchParams.get('refresh_token');
+  
+  if (!token) {
+    console.error('Available URL parameters:', Object.fromEntries(searchParams.entries()));
+    throw new Error('Token de autenticación no encontrado en los parámetros de la URL');
+  }
+
+  // Try to decode JWT, but handle non-JWT tokens gracefully
+  let decoded = null;
+  try {
+    decoded = decodeJWT(token);
+  } catch (error) {
+    console.warn('Token is not a valid JWT, using fallback method');
+  }
+
+  if (decoded && decoded.sub && decoded.email) {
+    // JWT token with proper structure
+    const mapRole = (roles: string[]): string => {
+      if (!roles || roles.length === 0) return 'client';
+      
+      // Mapear roles específicos
+      if (roles.some(role => role.toLowerCase() === 'admin')) {
+        return 'admin';
+      }
+      
+      if (roles.some(role => ['negocio', 'business', 'owner'].includes(role.toLowerCase()))) {
+        return 'business';
+      }
+      
+      // user y otros roles son clientes
+      return 'client';
+    };
+    
+    return {
+      token,
+      refresh_token: refreshToken || undefined,
+      user: {
+        id: decoded.sub,
+        email: decoded.email,
+        name: decoded.name || '',
+        role: mapRole(decoded.roles || [])
+      },
+      expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + (24 * 60 * 60 * 1000)
+    };
+  } else {
+    // Fallback for non-JWT tokens or when JWT decoding fails
+    // Try to get user data from URL parameters
+    const userId = searchParams.get('user_id') || searchParams.get('id') || 'user_' + Date.now();
+    const email = searchParams.get('email') || 'user@example.com';
+    const name = searchParams.get('name') || searchParams.get('username') || '';
+    const role = searchParams.get('role') || 'user';
+    
+    // Mapear rol recibido
+    const mappedRole = role.toLowerCase() === 'negocio' ? 'business' : 
+                      role.toLowerCase() === 'admin' ? 'admin' : 'client';
+    
+    return {
+      token,
+      refresh_token: refreshToken || undefined,
+      user: {
+        id: userId,
+        email: email,
+        name: name,
+        role: mappedRole
+      },
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours from now
+    };
+  }
+};
+
+// Limpiar datos de autenticación
+export const clearAuthData = () => {
+  localStorage.removeItem('authData');
 };

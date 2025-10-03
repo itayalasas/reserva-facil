@@ -298,13 +298,12 @@ export const BusinessServices = ({ setCurrentView }: BusinessServicesProps) => {
                     <span>Editar</span>
                   </button>
                   <button
-                    onClick={() => handleDelete(service.id)}
-                    className="flex-1 bg-red-50 text-red-600 py-2 px-4 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center space-x-2"
                     onClick={() => {
                       if (confirm('¿Estás seguro de que quieres eliminar este servicio?')) {
                         handleDelete(service.id);
                       }
                     }}
+                    className="flex-1 bg-red-50 text-red-600 py-2 px-4 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center space-x-2"
                   >
                     <Trash2 className="h-4 w-4" />
                     <span>Eliminar</span>
