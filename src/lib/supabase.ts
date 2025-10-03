@@ -1,103 +1,64 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Declare variables at module level
-let supabase: any
-let signUp: (email: string, password: string, name: string) => Promise<any>
-let signIn: (email: string, password: string) => Promise<any>
-let signOut: () => Promise<any>
-let getCurrentUser: () => Promise<any>
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.');
+}
 
-// Check if Supabase is properly configured
-const isSupabaseConfigured = supabaseUrl && 
-  supabaseAnonKey && 
-  !supabaseUrl.includes('placeholder') && 
-  !supabaseAnonKey.includes('placeholder') &&
-  supabaseUrl !== 'https://your-project-id.supabase.co' &&
-  supabaseAnonKey !== 'your_supabase_anon_key_here'
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
-if (!isSupabaseConfigured) {
-  console.warn('⚠️ Supabase not configured. Using mock client for development.')
-  
-  // Create a mock client that will show helpful error messages
-  const mockClient = {
-    auth: {
-      signUp: () => Promise.reject(new Error('Supabase not configured. Please click the Supabase button in settings to configure.')),
-      signInWithPassword: () => Promise.reject(new Error('Supabase not configured. Please click the Supabase button in settings to configure.')),
-      signOut: () => Promise.reject(new Error('Supabase not configured. Please click the Supabase button in settings to configure.')),
-      getUser: () => Promise.reject(new Error('Supabase not configured. Please click the Supabase button in settings to configure.')),
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } })
-        })
-      }),
-      insert: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
-      update: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
-      delete: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } })
-    })
-  }
-  
-  // Assign mock implementations
-  supabase = mockClient
-  
-  signUp = async (email: string, password: string, name: string) => {
-    throw new Error('❌ Supabase not configured. Please click the Supabase button in settings to configure.')
-  }
-  
-  signIn = async (email: string, password: string) => {
-    throw new Error('❌ Supabase not configured. Please click the Supabase button in settings to configure.')
-  }
-  
-  signOut = async () => {
-    throw new Error('❌ Supabase not configured. Please click the Supabase button in settings to configure.')
-  }
-  
-  getCurrentUser = async () => {
-    throw new Error('❌ Supabase not configured. Please click the Supabase button in settings to configure.')
-  }
-} else {
-  // Create real Supabase client
-  supabase = createClient(supabaseUrl, supabaseAnonKey)
-  
-  // Auth helpers
-  signUp = async (email: string, password: string, name: string) => {
+// Auth helpers
+export const signUp = async (email: string, password: string, role: 'business' | 'client') => {
+  try {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          name,
-          role: 'admin'
-        }
-      }
-    })
-    return { data, error }
+          role,
+        },
+      },
+    });
+    return { data, error };
+  } catch (err) {
+    return { 
+      data: null, 
+      error: { 
+        message: 'No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet o contacta al administrador.' 
+      } 
+    };
   }
-  
-  signIn = async (email: string, password: string) => {
+};
+
+export const signIn = async (email: string, password: string) => {
+  try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      password
-    })
-    return { data, error }
+      password,
+    });
+    return { data, error };
+  } catch (err) {
+    return { 
+      data: null, 
+      error: { 
+        message: 'No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet o contacta al administrador.' 
+      } 
+    };
   }
-  
-  signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    return { error }
-  }
-  
-  getCurrentUser = async () => {
-    const { data: { user }, error } = await supabase.auth.getUser()
-    return { user, error }
-  }
-}
+};
 
-// Export all variables at module level
-export { supabase, signUp, signIn, signOut, getCurrentUser }
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut();
+  return { error };
+};
+
+export const getCurrentUser = () => {
+  return supabase.auth.getUser();
+};
