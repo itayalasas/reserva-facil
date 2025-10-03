@@ -226,8 +226,29 @@ export const validateToken = async (token: string): Promise<boolean> => {
 export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
   const token = searchParams.get('token');
   const refreshToken = searchParams.get('refresh_token');
+  const state = searchParams.get('state');
+  const userId = searchParams.get('user_id');
+  const userEmail = searchParams.get('user_email');
+  const userName = searchParams.get('user_name');
+  const expiresIn = searchParams.get('expires_in');
   
   if (!token) {
+    // Check if we have alternative auth parameters
+    if (state === 'success' && userId && userEmail) {
+      // Create auth data from individual parameters
+      return {
+        token: `fallback_token_${Date.now()}`,
+        refresh_token: refreshToken || undefined,
+        user: {
+          id: userId,
+          email: decodeURIComponent(userEmail),
+          name: userName ? decodeURIComponent(userName) : '',
+          role: 'client' // Default role
+        },
+        expiresAt: expiresIn ? Date.now() + (parseInt(expiresIn) * 1000) : Date.now() + (24 * 60 * 60 * 1000)
+      };
+    }
+    
     console.error('Available URL parameters:', Object.fromEntries(searchParams.entries()));
     throw new Error('Token de autenticación no encontrado en los parámetros de la URL');
   }
@@ -271,10 +292,10 @@ export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
     };
   } else {
     // Fallback for non-JWT tokens or when JWT decoding fails
-    // Try to get user data from URL parameters
-    const userId = searchParams.get('user_id') || searchParams.get('id') || 'user_' + Date.now();
-    const email = searchParams.get('email') || 'user@example.com';
-    const name = searchParams.get('name') || searchParams.get('username') || '';
+    // Use the parameters we already extracted
+    const finalUserId = userId || searchParams.get('id') || 'user_' + Date.now();
+    const finalEmail = userEmail || searchParams.get('email') || 'user@example.com';
+    const finalName = userName || searchParams.get('name') || searchParams.get('username') || '';
     const role = searchParams.get('role') || 'user';
     
     // Mapear rol recibido
@@ -285,12 +306,12 @@ export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
       token,
       refresh_token: refreshToken || undefined,
       user: {
-        id: userId,
-        email: email,
-        name: name,
+        id: finalUserId,
+        email: decodeURIComponent(finalEmail),
+        name: finalName ? decodeURIComponent(finalName) : '',
         role: mappedRole
       },
-      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours from now
+      expiresAt: expiresIn ? Date.now() + (parseInt(expiresIn) * 1000) : Date.now() + (24 * 60 * 60 * 1000)
     };
   }
 };

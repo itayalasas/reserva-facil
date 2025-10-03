@@ -169,13 +169,19 @@ const AppContent = () => {
   // Detectar rutas especiales
   useEffect(() => {
     const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
     
     console.log('App - Current path:', path);
+    console.log('App - Search params:', Object.fromEntries(searchParams.entries()));
     
     if (path === '/auth/callback') {
       setCurrentView('auth-callback');
     } else if (path === '/maintenance') {
       setCurrentView('maintenance');
+    } else if (searchParams.has('state') && searchParams.has('token')) {
+      // Handle callback with query parameters (even if path is root)
+      console.log('Detected auth callback with parameters');
+      setCurrentView('auth-callback');
     }
   }, []);
 

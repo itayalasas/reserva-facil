@@ -219,11 +219,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       const urlParams = new URLSearchParams(window.location.search);
       
+      // Debug: Log all URL parameters
+      console.log('All URL params:', Object.fromEntries(urlParams.entries()));
+      
       // Verificar si es un callback con datos de autenticación directos
       const success = urlParams.get('success');
+      const state = urlParams.get('state');
       const authDataParam = urlParams.get('auth_data');
       
-      if (success === 'true' && authDataParam) {
+      // Check for direct auth_data parameter
+      if ((success === 'true' || state === 'success') && authDataParam) {
         try {
           // Decodificar datos de autenticación
           const authResponse = JSON.parse(decodeURIComponent(authDataParam));
@@ -248,10 +253,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       }
       
-      const token = urlParams.get('token');
+      // Check for state=success with individual parameters
+      if (state === 'success') {
+        try {
+          console.log('Processing state=success callback');
+          const authData = extractAuthData(urlParams);
+          localStorage.setItem('authData', JSON.stringify(authData));
+          
+          setExternalUser(authData);
+          setUserRole(authData.user.role.toLowerCase());
+          setIsExternalAuth(true);
+          
+          await ensurePublicUserExists({
+            id: authData.user.id,
+            email: authData.user.email,
+            name: authData.user.name,
+            role: authData.user.role
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Error processing state=success callback:', error);
+        }
+      }
       
-      // Debug: Log all URL parameters
-      console.log('All URL params:', Object.fromEntries(urlParams.entries()));
+      const token = urlParams.get('token');
       
       if (!token) {
         // Check if we have other auth parameters that might indicate success
