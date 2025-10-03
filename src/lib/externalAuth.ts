@@ -33,7 +33,8 @@ export interface ExternalUser {
 
 // Redirect to external auth provider
 export const redirectToExternalAuth = () => {
-  const authUrl = `${AUTH_BASE_URL}/login?callback=${encodeURIComponent(APP_CALLBACK_URL)}`;
+  const authUrl = `${AUTH_BASE_URL}/auth?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(APP_CALLBACK_URL)}`;
+  console.log('🔗 External auth URL:', authUrl);
   window.location.href = authUrl;
 };
 
@@ -84,7 +85,7 @@ export const getStoredExternalUser = (): ExternalUser | null => {
 // Validate token with external service
 export const validateExternalToken = async (token: string): Promise<boolean> => {
   try {
-    const response = await fetch(`${AUTH_BASE_URL}/auth/${APP_ID}/validate`, {
+    const response = await fetch(`${AUTH_BASE_URL}/api/auth/validate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
