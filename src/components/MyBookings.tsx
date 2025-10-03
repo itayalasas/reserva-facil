@@ -32,6 +32,7 @@ export const MyBookings = ({ setCurrentView }: MyBookingsProps) => {
 
   // Refrescar bookings cuando se cambia a esta vista
   useEffect(() => {
+    console.log('MyBookings mounted, fetching bookings...');
     const userId = getCurrentUserId();
     if (userId) {
       fetchBookings();

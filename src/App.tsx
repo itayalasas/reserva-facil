@@ -30,12 +30,33 @@ const AppContent = () => {
 
   // Detectar callback de pago y procesar reserva
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    // Extraer parámetros tanto de search como de hash
+    let urlParams: URLSearchParams;
+
+    // Si hay hash, los parámetros están después del hash
+    if (window.location.hash && window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1];
+      urlParams = new URLSearchParams(hashQuery);
+      console.log('Extracting params from hash:', hashQuery);
+    } else {
+      urlParams = new URLSearchParams(window.location.search);
+      console.log('Extracting params from search:', window.location.search);
+    }
+
     const paymentStatus = urlParams.get('payment');
     const paymentId = urlParams.get('payment_id');
     const status = urlParams.get('status');
     const externalReference = urlParams.get('external_reference');
-    
+
+    console.log('Payment callback params:', {
+      paymentStatus,
+      paymentId,
+      status,
+      externalReference,
+      isAuthenticated,
+      paymentProcessed
+    });
+
     // Procesar callback de pago si existe y el usuario está autenticado
     if (paymentStatus && externalReference && isAuthenticated && !paymentProcessed) {
       console.log('Processing payment callback:', {
@@ -44,11 +65,11 @@ const AppContent = () => {
         status,
         externalReference
       });
-      
+
       setProcessingPayment(true);
       processPaymentCallback(paymentStatus, externalReference, paymentId);
     }
-    
+
     // También procesar si viene directamente con status=approved de Mercado Pago
     if (!paymentStatus && status === 'approved' && externalReference && isAuthenticated && !paymentProcessed) {
       console.log('Processing Mercado Pago direct callback:', {
@@ -56,7 +77,7 @@ const AppContent = () => {
         externalReference,
         paymentId
       });
-      
+
       setProcessingPayment(true);
       processPaymentCallback('success', externalReference, paymentId);
     }
@@ -125,9 +146,10 @@ const AppContent = () => {
 
       console.log('Booking updated successfully:', { bookingId: booking.id, status: newStatus, paymentId });
       
-      // Limpiar URL completamente
+      // Limpiar URL completamente (incluyendo hash)
       const cleanUrl = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
+      window.location.hash = '';
       
       // Marcar como procesado
       setPaymentProcessed(true);
@@ -156,9 +178,10 @@ const AppContent = () => {
         `No se pudo actualizar la reserva: ${error.message || 'Error desconocido'}`
       );
       
-      // Limpiar URL incluso si hay error
+      // Limpiar URL incluso si hay error (incluyendo hash)
       const cleanUrl = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
+      window.location.hash = '';
       
       setTimeout(() => {
         setCurrentView('my-bookings');
