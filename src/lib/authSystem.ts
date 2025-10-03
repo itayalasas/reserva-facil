@@ -122,6 +122,54 @@ export const redirectToAuth = async (action: 'login' | 'register' = 'login') => 
   }
 };
 
+// Procesar respuesta de autenticación exitosa
+export const processAuthResponse = async (authResponse: any): Promise<AuthData> => {
+  try {
+    console.log('Processing auth response:', authResponse);
+    
+    // Si la respuesta incluye directamente los datos de auth
+    if (authResponse.success && authResponse.data) {
+      const { access_token, refresh_token, user } = authResponse.data;
+      
+      if (!access_token || !user) {
+        throw new Error('Respuesta de autenticación incompleta');
+      }
+      
+      // Mapear rol del usuario
+      const mapRole = (roles: string[]): string => {
+        if (!roles || roles.length === 0) return 'client';
+        
+        if (roles.some(role => role.toLowerCase() === 'admin')) {
+          return 'admin';
+        }
+        
+        if (roles.some(role => ['negocio', 'business', 'owner'].includes(role.toLowerCase()))) {
+          return 'business';
+        }
+        
+        return 'client';
+      };
+      
+      return {
+        token: access_token,
+        refresh_token: refresh_token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name || '',
+          role: mapRole(user.roles || [])
+        },
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 horas
+      };
+    }
+    
+    throw new Error('Formato de respuesta de autenticación no válido');
+  } catch (error) {
+    console.error('Error procesando respuesta de auth:', error);
+    throw error;
+  }
+};
+
 // Validar token con el servidor de autenticación
 export const validateToken = async (token: string): Promise<boolean> => {
   try {

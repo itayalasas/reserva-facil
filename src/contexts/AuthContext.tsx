@@ -8,6 +8,7 @@ import {
   redirectToAuth, 
   clearAuthData,
   extractAuthData,
+  processAuthResponse,
   validateToken
 } from '../lib/authSystem';
 
@@ -217,6 +218,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.log('Search params:', window.location.search);
       
       const urlParams = new URLSearchParams(window.location.search);
+      
+      // Verificar si es un callback con datos de autenticación directos
+      const success = urlParams.get('success');
+      const authDataParam = urlParams.get('auth_data');
+      
+      if (success === 'true' && authDataParam) {
+        try {
+          // Decodificar datos de autenticación
+          const authResponse = JSON.parse(decodeURIComponent(authDataParam));
+          const authData = await processAuthResponse(authResponse);
+          
+          localStorage.setItem('authData', JSON.stringify(authData));
+          
+          setExternalUser(authData);
+          setUserRole(authData.user.role.toLowerCase());
+          setIsExternalAuth(true);
+          
+          await ensurePublicUserExists({
+            id: authData.user.id,
+            email: authData.user.email,
+            name: authData.user.name,
+            role: authData.user.role
+          });
+          
+          return true;
+        } catch (parseError) {
+          console.error('Error parsing auth data:', parseError);
+        }
+      }
+      
       const token = urlParams.get('token');
       
       // Debug: Log all URL parameters
