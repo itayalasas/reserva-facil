@@ -7,9 +7,10 @@ interface BusinessDetailProps {
   business: Business;
   setCurrentView: (view: string) => void;
   setSelectedBusiness: (business: Business) => void;
+  setSelectedService: (service: Service | null) => void;
 }
 
-export const BusinessDetail = ({ business, setCurrentView, setSelectedBusiness }: BusinessDetailProps) => {
+export const BusinessDetail = ({ business, setCurrentView, setSelectedBusiness, setSelectedService }: BusinessDetailProps) => {
   const [services, setServices] = useState<Service[]>([]);
   const [schedules, setSchedules] = useState<BusinessSchedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,8 +96,9 @@ export const BusinessDetail = ({ business, setCurrentView, setSelectedBusiness }
     }
   };
 
-  const handleBookService = () => {
+  const handleBookService = (service?: Service) => {
     setSelectedBusiness(business);
+    setSelectedService(service || null);
     setCurrentView('booking-process');
   };
 
@@ -279,7 +281,7 @@ export const BusinessDetail = ({ business, setCurrentView, setSelectedBusiness }
                                 </div>
                               </div>
                               <button
-                                onClick={handleBookService}
+                                onClick={() => handleBookService(service)}
                                 className="bg-blue-600 text-white px-6 py-2 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
                               >
                                 Reservar

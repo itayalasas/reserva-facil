@@ -60,18 +60,13 @@ export const PaymentForm = ({
         externalReference
       };
 
-      console.log('Creating payment preference with data:', paymentData);
-      console.log('Using access token:', accessToken.substring(0, 20) + '...'); // Debug (solo primeros 20 chars)
       const preference = await createPaymentPreference(accessToken, paymentData);
-      console.log('Preference created, redirecting to:', preference.init_point);
       
       // Priorizar sandbox_init_point para desarrollo
       const checkoutUrl = preference.sandbox_init_point 
         ? preference.sandbox_init_point 
         : preference.init_point;
       
-      console.log('Environment: DEVELOPMENT/SANDBOX');
-      console.log('Final checkout URL:', checkoutUrl);
       
       // Redirigir al checkout de Mercado Pago
       if (checkoutUrl) {
@@ -161,7 +156,6 @@ export const PaymentForm = ({
           }, 2000);
         },
         onFetching: (resource: string) => {
-          console.log("Fetching resource: ", resource);
         }
       },
     });

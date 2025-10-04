@@ -6,13 +6,14 @@ import { Business, Service } from '../types';
 interface BrowseServicesProps {
   setCurrentView: (view: string) => void;
   setSelectedBusiness: (business: Business) => void;
+  setSelectedService: (service: Service | null) => void;
 }
 
 interface BusinessWithServices extends Business {
   services: Service[];
 }
 
-export const BrowseServices = ({ setCurrentView, setSelectedBusiness }: BrowseServicesProps) => {
+export const BrowseServices = ({ setCurrentView, setSelectedBusiness, setSelectedService }: BrowseServicesProps) => {
   const [businesses, setBusinesses] = useState<BusinessWithServices[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

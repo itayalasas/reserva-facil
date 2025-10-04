@@ -86,7 +86,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           return false;
         }
 
-        console.log('User created in public.users table:', userData.id);
       } else {
         // Update existing user data if needed
         const { error: updateError } = await supabase
@@ -127,7 +126,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const checkTokenExpiration = () => {
     const authData = getStoredAuthData();
     if (authData && !isTokenValid(authData)) {
-      console.log('Token expirado, cerrando sesión');
       logout();
     }
   };
@@ -213,14 +211,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const processAuthCallback = async (): Promise<boolean> => {
     try {
-      // Debug: Log current URL and parameters
-      console.log('Current URL:', window.location.href);
-      console.log('Search params:', window.location.search);
-      
       const urlParams = new URLSearchParams(window.location.search);
-      
-      // Debug: Log all URL parameters
-      console.log('All URL params:', Object.fromEntries(urlParams.entries()));
       
       // Verificar si es un callback con datos de autenticación directos
       const success = urlParams.get('success');
@@ -230,12 +221,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Check for direct auth_data parameter
       if ((success === 'true' || state === 'success') && authDataParam) {
         try {
-          // Decodificar datos de autenticación
           const authResponse = JSON.parse(decodeURIComponent(authDataParam));
           const authData = await processAuthResponse(authResponse);
-          
+
           localStorage.setItem('authData', JSON.stringify(authData));
-          
+
           setExternalUser(authData);
           setUserRole(authData.user.role.toLowerCase());
           setIsExternalAuth(true);
@@ -256,10 +246,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Check for state=success with individual parameters
       if (state === 'success') {
         try {
-          console.log('Processing state=success callback');
           const authData = extractAuthData(urlParams);
+
           localStorage.setItem('authData', JSON.stringify(authData));
-          
+
           setExternalUser(authData);
           setUserRole(authData.user.role.toLowerCase());
           setIsExternalAuth(true);
@@ -287,10 +277,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         // Try alternative token parameter names
         const alternativeToken = authToken || accessToken;
-        
+
         if (alternativeToken) {
-          console.log('Using alternative token parameter:', alternativeToken);
-          // Process with alternative token
           const isValid = await validateToken(alternativeToken);
           if (!isValid) {
             throw new Error('Token de autenticación inválido');
@@ -316,10 +304,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           return true;
         }
         
-        // If success=true but no token, it might be a different auth flow
         if (success === 'true') {
-          console.log('Success callback without token - checking for user data');
-          // Try to extract user data from other parameters
           const userId = urlParams.get('user_id') || urlParams.get('id');
           const email = urlParams.get('email');
           const name = urlParams.get('name');
@@ -346,20 +331,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             return true;
           }
         }
-        
-        console.error('No token found in URL parameters:', Object.fromEntries(urlParams.entries()));
+
         throw new Error('Token de autenticación no encontrado en la URL de callback');
       }
 
       // Validar token
       // Skip server validation in development mode or if server is not available
       try {
-        const isValid = await validateToken(token);
-        if (!isValid) {
-          console.warn('Token validation failed with server, proceeding with local validation');
-        }
+        await validateToken(token);
       } catch (validationError) {
-        console.warn('Server validation unavailable, using local validation:', validationError);
+        // Continue with local validation
       }
 
       // Extraer y guardar datos de autenticación
@@ -375,7 +356,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
       
       if (!userCreated) {
-        console.warn('Failed to create user in public.users table, but continuing...');
+        // Continue anyway
       }
       
       // Actualizar estado inmediatamente

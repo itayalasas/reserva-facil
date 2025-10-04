@@ -5,17 +5,19 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Notification, useNotification } from './Notification';
 import { Business, Service } from '../types';
+import { ReservaFacilIcon } from './ReservaFacilIcon';
 
 interface HomePageProps {
   setCurrentView: (view: string) => void;
   setSelectedBusiness: (business: Business) => void;
+  setSelectedService: (service: Service | null) => void;
 }
 
 interface BusinessWithServices extends Business {
   services: Service[];
 }
 
-export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps) => {
+export const HomePage = ({ setCurrentView, setSelectedBusiness, setSelectedService }: HomePageProps) => {
   const { isAuthenticated, userRole, user, externalUser, isExternalAuth } = useAuth();
   const { notification, showSuccess, showError, hideNotification } = useNotification();
   const [businesses, setBusinesses] = useState<BusinessWithServices[]>([]);
@@ -61,13 +63,6 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
     
     // Only process if user is authenticated and we have payment parameters
     if (isAuthenticated && (paymentStatus || status === 'approved') && externalReference) {
-      console.log('Processing payment callback on HomePage:', {
-        paymentStatus,
-        status,
-        externalReference,
-        paymentId
-      });
-      
       setProcessingPayment(true);
       processPaymentCallback(paymentStatus || 'success', externalReference, paymentId);
     }
@@ -75,7 +70,6 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
 
   const processPaymentCallback = async (paymentStatus: string, externalReference: string, paymentId?: string) => {
     try {
-      console.log('Processing payment callback:', { paymentStatus, externalReference, paymentId });
       
       // Extract timestamp from external_reference
       const timestampMatch = externalReference.match(/booking_(\d+)/);
@@ -85,7 +79,6 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
       }
       
       const timestamp = timestampMatch[1];
-      console.log('Extracted timestamp:', timestamp);
 
       // Search for booking with this timestamp in notes
       const { data: bookings, error: searchError } = await supabase
@@ -116,13 +109,11 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
       }
 
       const booking = bookings[0];
-      console.log('Found booking:', booking);
 
       // Update booking status
       const newStatus = paymentStatus === 'success' ? 'confirmed' : 
                        paymentStatus === 'pending' ? 'pending' : 'cancelled';
       
-      console.log('Updating booking status to:', newStatus);
       
       const { error } = await supabase
         .from('bookings')
@@ -134,7 +125,6 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
 
       if (error) throw error;
 
-      console.log('Booking updated successfully:', { bookingId: booking.id, status: newStatus, paymentId });
       
       // Clean URL completely
       const cleanUrl = window.location.origin + window.location.pathname;
@@ -243,9 +233,10 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
     setCurrentView('business-detail');
   };
 
-  const handleBookNow = (business: Business, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleBookNow = (business: Business, service?: Service, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setSelectedBusiness(business);
+    setSelectedService(service || null);
     setCurrentView('booking-process');
   };
 
@@ -301,9 +292,7 @@ export const HomePage = ({ setCurrentView, setSelectedBusiness }: HomePageProps)
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-2xl">
-                <Calendar className="h-8 w-8 text-white" />
-              </div>
+              <ReservaFacilIcon size={48} />
               <span className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">ReservaFácil</span>
             </div>
             {!isAuthenticated ? (

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Calendar, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { MaintenancePage } from './MaintenancePage';
+import { ReservaFacilIcon } from './ReservaFacilIcon';
 
 interface AuthCallbackProps {
   setCurrentView: (view: string) => void;
 }
 
 export const AuthCallback = ({ setCurrentView }: AuthCallbackProps) => {
-  const { processAuthCallback, userRole } = useAuth();
+  const { processAuthCallback } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Procesando autenticación...');
   const [errorType, setErrorType] = useState<'maintenance' | 'auth_error' | 'server_error'>('auth_error');
@@ -23,26 +24,22 @@ export const AuthCallback = ({ setCurrentView }: AuthCallbackProps) => {
       const urlParams = new URLSearchParams(window.location.search);
       const paymentStatus = urlParams.get('payment');
       const externalReference = urlParams.get('external_reference');
-      
+
       if (paymentStatus && externalReference) {
-        console.log('Payment callback detected, redirecting to booking process');
         // This is a payment callback, redirect to home with payment params
         const paymentParams = new URLSearchParams();
         paymentParams.set('payment', paymentStatus);
         if (urlParams.get('payment_id')) paymentParams.set('payment_id', urlParams.get('payment_id')!);
         if (urlParams.get('status')) paymentParams.set('status', urlParams.get('status')!);
         paymentParams.set('external_reference', externalReference);
-        
+
         window.location.href = `/?${paymentParams.toString()}`;
         return;
       }
-      
+
       setMessage('Procesando autenticación...');
-      
-      // Debug: Log the callback URL
-      console.log('AuthCallback - Processing URL:', window.location.href);
-      
-      // Procesar callback usando el contexto de autenticación
+
+      // Procesar callback
       const success = await processAuthCallback();
       
       if (!success) {
@@ -71,7 +68,6 @@ export const AuthCallback = ({ setCurrentView }: AuthCallbackProps) => {
       }, 1500);
       
     } catch (error) {
-      console.error('Error en callback de autenticación:', error);
       setStatus('error');
       
       // Determinar el tipo de error
@@ -106,7 +102,7 @@ export const AuthCallback = ({ setCurrentView }: AuthCallbackProps) => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-6">
-            <Calendar className="h-12 w-12 text-blue-600" />
+            <ReservaFacilIcon size={48} />
             <span className="text-3xl font-bold text-gray-900">ReservaFácil</span>
           </div>
           

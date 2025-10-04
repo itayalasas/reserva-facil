@@ -3,14 +3,7 @@ const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL;
 const APP_ID = import.meta.env.VITE_AUTH_APP_ID || 'app_mg1rvnob8d0563aa3323fa8e';
 const APP_CALLBACK_URL = window.location.origin + '/auth/callback';
 
-// Debug environment variables
-console.log('🔍 External Auth Environment Check:', {
-  AUTH_BASE_URL: AUTH_BASE_URL ? `✅ Set (${AUTH_BASE_URL})` : '❌ Missing VITE_AUTH_BASE_URL',
-  APP_ID: APP_ID ? `✅ Set (${APP_ID})` : '❌ Missing VITE_AUTH_APP_ID'
-});
-
 if (!AUTH_BASE_URL) {
-  console.error('❌ External Auth configuration missing');
   throw new Error('VITE_AUTH_BASE_URL environment variable is required');
 }
 
@@ -32,9 +25,9 @@ export interface ExternalUser {
 }
 
 // Redirect to external auth provider
-export const redirectToExternalAuth = () => {
-  const authUrl = `${AUTH_BASE_URL}/auth?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(APP_CALLBACK_URL)}`;
-  console.log('🔗 External auth URL:', authUrl);
+export const redirectToExternalAuth = (mode: 'login' | 'register' = 'login') => {
+  const endpoint = mode === 'register' ? '/register' : '/auth';
+  const authUrl = `${AUTH_BASE_URL}${endpoint}?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(APP_CALLBACK_URL)}&mode=${mode}`;
   window.location.href = authUrl;
 };
 

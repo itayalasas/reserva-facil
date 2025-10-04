@@ -3,19 +3,8 @@ const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL;
 const APP_ID = import.meta.env.VITE_AUTH_APP_ID || 'app_9c0ffde2-fc7';
 const API_KEY = import.meta.env.VITE_AUTH_API_KEY || 'ak_development_cd9bac61b17b0a09f307afe54e93d40f';
 
-// Debug environment variables
-console.log('🔍 Auth Environment Check:', {
-  AUTH_BASE_URL: AUTH_BASE_URL ? `✅ Set (${AUTH_BASE_URL})` : '❌ Missing VITE_AUTH_BASE_URL',
-  APP_ID: APP_ID ? `✅ Set (${APP_ID})` : '❌ Missing VITE_AUTH_APP_ID',
-  API_KEY: API_KEY ? `✅ Set (${API_KEY.substring(0, 20)}...)` : '❌ Missing VITE_AUTH_API_KEY'
-});
 
 if (!AUTH_BASE_URL) {
-  console.error('❌ MISSING AUTH CONFIGURATION:', {
-    VITE_AUTH_BASE_URL: AUTH_BASE_URL || 'undefined',
-    VITE_AUTH_APP_ID: APP_ID || 'undefined',
-    VITE_AUTH_API_KEY: API_KEY ? '[PRESENT]' : 'undefined'
-  });
   
   const errorMessage = `
 🚨 AUTHENTICATION CONFIGURATION ERROR 🚨
@@ -64,7 +53,6 @@ const decodeJWT = (token: string) => {
     }).join(''));
     return JSON.parse(jsonPayload);
   } catch (error) {
-    console.error('Error decodificando JWT:', error);
     return null;
   }
 };
@@ -78,7 +66,6 @@ export const getStoredAuthData = (): AuthData | null => {
     const authData = JSON.parse(stored);
     return authData;
   } catch (error) {
-    console.error('Error al obtener datos de autenticación:', error);
     return null;
   }
 };
@@ -107,17 +94,11 @@ export const isTokenExpiringSoon = (authData: AuthData): boolean => {
 // Redirigir a autenticación
 export const redirectToAuth = async (action: 'login' | 'register' = 'login') => {
   try {
-    // Usar el mismo endpoint /auth para login y register
-    const authUrl = `${AUTH_BASE_URL}/auth?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}`;
-    
-    console.log('🔗 Redirecting to auth URL:', authUrl);
-    
-    // Redirigir directamente sin verificar health
+    const endpoint = action === 'register' ? '/register' : '/auth';
+    const authUrl = `${AUTH_BASE_URL}${endpoint}?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}&mode=${action}`;
     window.location.href = authUrl;
-      
+
   } catch (error) {
-    console.error(`Error al redirigir a ${action}:`, error);
-    // Redirigir a página de mantenimiento
     window.location.href = '/maintenance';
   }
 };
@@ -125,31 +106,31 @@ export const redirectToAuth = async (action: 'login' | 'register' = 'login') => 
 // Procesar respuesta de autenticación exitosa
 export const processAuthResponse = async (authResponse: any): Promise<AuthData> => {
   try {
-    console.log('Processing auth response:', authResponse);
-    
-    // Si la respuesta incluye directamente los datos de auth
     if (authResponse.success && authResponse.data) {
       const { access_token, refresh_token, user } = authResponse.data;
-      
+
       if (!access_token || !user) {
         throw new Error('Respuesta de autenticación incompleta');
       }
-      
-      // Mapear rol del usuario
+
       const mapRole = (roles: string[]): string => {
-        if (!roles || roles.length === 0) return 'client';
-        
+        if (!roles || roles.length === 0) {
+          return 'client';
+        }
+
         if (roles.some(role => role.toLowerCase() === 'admin')) {
           return 'admin';
         }
-        
+
         if (roles.some(role => ['negocio', 'business', 'owner'].includes(role.toLowerCase()))) {
           return 'business';
         }
-        
+
         return 'client';
       };
-      
+
+      const mappedRole = mapRole(user.roles || []);
+
       return {
         token: access_token,
         refresh_token: refresh_token,
@@ -157,15 +138,14 @@ export const processAuthResponse = async (authResponse: any): Promise<AuthData> 
           id: user.id,
           email: user.email,
           name: user.name || '',
-          role: mapRole(user.roles || [])
+          role: mappedRole
         },
         expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 horas
       };
     }
-    
+
     throw new Error('Formato de respuesta de autenticación no válido');
   } catch (error) {
-    console.error('Error procesando respuesta de auth:', error);
     throw error;
   }
 };
@@ -173,16 +153,12 @@ export const processAuthResponse = async (authResponse: any): Promise<AuthData> 
 // Validar token con el servidor de autenticación
 export const validateToken = async (token: string): Promise<boolean> => {
   try {
-    // Primero intentar decodificar el JWT para verificar estructura
     const decoded = decodeJWT(token);
     if (!decoded || !decoded.sub || !decoded.email) {
-      console.warn('JWT structure validation failed');
       return false;
     }
 
-    // Verificar expiración del token
     if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-      console.log('Token JWT expirado');
       return false;
     }
 
@@ -205,19 +181,13 @@ export const validateToken = async (token: string): Promise<boolean> => {
       if (response.ok) {
         return true;
       } else {
-        console.log('Token inválido según el servidor');
-        // If server says invalid but JWT is structurally valid, trust local validation
         return true;
       }
     } catch (serverError) {
-      // Si no se puede validar con el servidor, confiar en la validación local
-      console.warn('No se pudo validar con el servidor, usando validación local');
       return true;
     }
     
   } catch (error) {
-    console.error('Error validando token:', error);
-    // If there's any error, but we have a token, assume it's valid for development
     return true;
   }
 };
@@ -235,6 +205,11 @@ export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
   if (!token) {
     // Check if we have alternative auth parameters
     if (state === 'success' && userId && userEmail) {
+      const roleParam = searchParams.get('role') || searchParams.get('user_role') || 'user';
+      const mappedRole = roleParam.toLowerCase() === 'negocio' ? 'business' :
+                        roleParam.toLowerCase() === 'admin' ? 'admin' :
+                        roleParam.toLowerCase() === 'business' ? 'business' : 'client';
+
       // Create auth data from individual parameters
       return {
         token: `fallback_token_${Date.now()}`,
@@ -243,13 +218,12 @@ export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
           id: userId,
           email: decodeURIComponent(userEmail),
           name: userName ? decodeURIComponent(userName) : '',
-          role: 'client' // Default role
+          role: mappedRole
         },
         expiresAt: expiresIn ? Date.now() + (parseInt(expiresIn) * 1000) : Date.now() + (24 * 60 * 60 * 1000)
       };
     }
-    
-    console.error('Available URL parameters:', Object.fromEntries(searchParams.entries()));
+
     throw new Error('Token de autenticación no encontrado en los parámetros de la URL');
   }
 
@@ -258,7 +232,7 @@ export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
   try {
     decoded = decodeJWT(token);
   } catch (error) {
-    console.warn('Token is not a valid JWT, using fallback method');
+    // Fallback method
   }
 
   if (decoded && decoded.sub && decoded.email) {
@@ -296,11 +270,11 @@ export const extractAuthData = (searchParams: URLSearchParams): AuthData => {
     const finalUserId = userId || searchParams.get('id') || 'user_' + Date.now();
     const finalEmail = userEmail || searchParams.get('email') || 'user@example.com';
     const finalName = userName || searchParams.get('name') || searchParams.get('username') || '';
-    const role = searchParams.get('role') || 'user';
-    
-    // Mapear rol recibido
-    const mappedRole = role.toLowerCase() === 'negocio' ? 'business' : 
-                      role.toLowerCase() === 'admin' ? 'admin' : 'client';
+    const role = searchParams.get('role') || searchParams.get('user_role') || 'user';
+
+    const mappedRole = role.toLowerCase() === 'negocio' ? 'business' :
+                      role.toLowerCase() === 'admin' ? 'admin' :
+                      role.toLowerCase() === 'business' ? 'business' : 'client';
     
     return {
       token,

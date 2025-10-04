@@ -50,7 +50,6 @@ export const createPaymentPreference = async (
   paymentData: PaymentData
 ) => {
   try {
-    console.log('Creating preference with amount:', paymentData.amount);
     
     // Detectar si es ambiente de test/sandbox
     const isTestEnvironment = accessToken.startsWith('TEST-') || 
@@ -61,8 +60,6 @@ export const createPaymentPreference = async (
       ? 'https://api.mercadopago.com/checkout/preferences' // Sandbox usa la misma URL pero con credenciales TEST
       : 'https://api.mercadopago.com/checkout/preferences';
     
-    console.log('Environment detected:', isTestEnvironment ? 'SANDBOX/TEST' : 'PRODUCTION');
-    console.log('Using access token type:', accessToken.substring(0, 20) + '...');
     
     const response = await fetch(baseUrl, {
       method: 'POST',
@@ -113,11 +110,9 @@ export const createPaymentPreference = async (
     }
 
     const preference = await response.json();
-    console.log('Payment preference created:', preference);
     
     // Siempre usar sandbox_init_point si está disponible para desarrollo
     const checkoutUrl = preference.sandbox_init_point || preference.init_point;
-    console.log('Final checkout URL:', checkoutUrl);
     
     return preference;
   } catch (error) {

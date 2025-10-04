@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Menu, X, Calendar, LogOut, User } from 'lucide-react';
+import { Menu, X, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { ReservaFacilIcon } from './ReservaFacilIcon';
 
 interface NavbarProps {
   currentView: string;
@@ -15,15 +16,6 @@ export const Navbar = ({ currentView, setCurrentView }: NavbarProps) => {
   const userEmail = isExternalAuth ? externalUser?.user?.email : user?.email;
   const userName = isExternalAuth ? externalUser?.user?.name : user?.user_metadata?.name;
 
-  // Debug: Log current auth state
-  console.log('Navbar - Auth state:', {
-    isExternalAuth,
-    externalUser,
-    user,
-    userRole,
-    loading
-  });
-
   const handleSignOut = async () => {
     await logout();
     setCurrentView('home');
@@ -37,7 +29,7 @@ export const Navbar = ({ currentView, setCurrentView }: NavbarProps) => {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <div className="flex items-center space-x-2">
-                <Calendar className="h-8 w-8 text-blue-600" />
+                <ReservaFacilIcon size={32} />
                 <span className="text-xl font-bold text-gray-800">ReservaFácil</span>
               </div>
             </div>
@@ -55,11 +47,11 @@ export const Navbar = ({ currentView, setCurrentView }: NavbarProps) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <div 
+            <div
               className="flex items-center space-x-2 cursor-pointer"
               onClick={() => setCurrentView('home')}
             >
-              <Calendar className="h-8 w-8 text-blue-600" />
+              <ReservaFacilIcon size={32} />
               <span className="text-xl font-bold text-gray-800">ReservaFácil</span>
             </div>
           </div>

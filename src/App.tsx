@@ -25,6 +25,7 @@ const AppContent = () => {
   const { notification, showSuccess, showError, hideNotification } = useNotification();
   const [currentView, setCurrentView] = useState('home');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentProcessed, setPaymentProcessed] = useState(false);
 
@@ -37,10 +38,8 @@ const AppContent = () => {
     if (window.location.hash && window.location.hash.includes('?')) {
       const hashQuery = window.location.hash.split('?')[1];
       urlParams = new URLSearchParams(hashQuery);
-      console.log('Extracting params from hash:', hashQuery);
     } else {
       urlParams = new URLSearchParams(window.location.search);
-      console.log('Extracting params from search:', window.location.search);
     }
 
     const paymentStatus = urlParams.get('payment');
@@ -48,36 +47,14 @@ const AppContent = () => {
     const status = urlParams.get('status');
     const externalReference = urlParams.get('external_reference');
 
-    console.log('Payment callback params:', {
-      paymentStatus,
-      paymentId,
-      status,
-      externalReference,
-      isAuthenticated,
-      paymentProcessed
-    });
-
     // Procesar callback de pago si existe y el usuario está autenticado
     if (paymentStatus && externalReference && isAuthenticated && !paymentProcessed) {
-      console.log('Processing payment callback:', {
-        paymentStatus,
-        paymentId,
-        status,
-        externalReference
-      });
-
       setProcessingPayment(true);
       processPaymentCallback(paymentStatus, externalReference, paymentId);
     }
 
     // También procesar si viene directamente con status=approved de Mercado Pago
     if (!paymentStatus && status === 'approved' && externalReference && isAuthenticated && !paymentProcessed) {
-      console.log('Processing Mercado Pago direct callback:', {
-        status,
-        externalReference,
-        paymentId
-      });
-
       setProcessingPayment(true);
       processPaymentCallback('success', externalReference, paymentId);
     }
@@ -85,7 +62,6 @@ const AppContent = () => {
 
   const processPaymentCallback = async (paymentStatus: string, externalReference: string, paymentId?: string) => {
     try {
-      console.log('Processing payment callback:', { paymentStatus, externalReference, paymentId });
       
       // Buscar la reserva usando el external_reference en las notas
       const timestampMatch = externalReference.match(/booking_(\d+)/);
@@ -95,7 +71,6 @@ const AppContent = () => {
       }
       
       const timestamp = timestampMatch[1];
-      console.log('Extracted timestamp:', timestamp);
 
       // Buscar la reserva que contiene este timestamp en las notas
       const { data: bookings, error: searchError } = await supabase
@@ -126,13 +101,11 @@ const AppContent = () => {
       }
 
       const booking = bookings[0];
-      console.log('Found booking:', booking);
 
       // Actualizar estado de la reserva
       const newStatus = paymentStatus === 'success' ? 'confirmed' : 
                        paymentStatus === 'pending' ? 'pending' : 'cancelled';
       
-      console.log('Updating booking status to:', newStatus);
       
       const { error } = await supabase
         .from('bookings')
@@ -144,7 +117,6 @@ const AppContent = () => {
 
       if (error) throw error;
 
-      console.log('Booking updated successfully:', { bookingId: booking.id, status: newStatus, paymentId });
       
       // Limpiar URL completamente (incluyendo hash)
       const cleanUrl = window.location.origin + window.location.pathname;
@@ -194,8 +166,6 @@ const AppContent = () => {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
     
-    console.log('App - Current path:', path);
-    console.log('App - Search params:', Object.fromEntries(searchParams.entries()));
     
     if (path === '/auth/callback') {
       setCurrentView('auth-callback');
@@ -203,7 +173,6 @@ const AppContent = () => {
       setCurrentView('maintenance');
     } else if (searchParams.has('state') && searchParams.has('token')) {
       // Handle callback with query parameters (even if path is root)
-      console.log('Detected auth callback with parameters');
       setCurrentView('auth-callback');
     }
   }, []);
@@ -228,13 +197,13 @@ const AppContent = () => {
 
     switch (currentView) {
       case 'home':
-        return <HomePage setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+        return <HomePage setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} setSelectedService={setSelectedService} />;
       case 'login':
         return <AuthForms view="login" setCurrentView={setCurrentView} />;
       case 'register':
         return <AuthForms view="register" setCurrentView={setCurrentView} />;
       case 'browse':
-        return <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+        return <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} setSelectedService={setSelectedService} />;
       case 'business-dashboard':
         return <BusinessDashboard setCurrentView={setCurrentView} />;
       case 'business-setup':
@@ -247,19 +216,21 @@ const AppContent = () => {
         return <BusinessSettings setCurrentView={setCurrentView} />;
       case 'business-detail':
         return selectedBusiness ? (
-          <BusinessDetail 
-            business={selectedBusiness} 
+          <BusinessDetail
+            business={selectedBusiness}
             setCurrentView={setCurrentView}
             setSelectedBusiness={setSelectedBusiness}
+            setSelectedService={setSelectedService}
           />
-        ) : <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+        ) : <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} setSelectedService={setSelectedService} />;
       case 'booking-process':
         return selectedBusiness ? (
-          <BookingProcess 
-            business={selectedBusiness} 
+          <BookingProcess
+            business={selectedBusiness}
+            preselectedService={selectedService}
             setCurrentView={setCurrentView}
           />
-        ) : <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} />;
+        ) : <BrowseServices setCurrentView={setCurrentView} setSelectedBusiness={setSelectedBusiness} setSelectedService={setSelectedService} />;
       case 'my-bookings':
         return <MyBookings setCurrentView={setCurrentView} />;
       case 'business-bookings':

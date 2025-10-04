@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Calendar, ArrowRight, Shield, Zap, Users, CheckCircle } from 'lucide-react';
+import { ArrowRight, Shield, Zap, Users, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { ReservaFacilIcon } from './ReservaFacilIcon';
 
 interface AuthFormsProps {
   view: 'login' | 'register';
@@ -31,7 +32,7 @@ export const AuthForms = ({ view, setCurrentView }: AuthFormsProps) => {
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-6">
-              <Calendar className="h-12 w-12 text-blue-600" />
+              <ReservaFacilIcon size={48} />
               <span className="text-3xl font-bold text-gray-900">ReservaFácil</span>
             </div>
             
@@ -91,7 +92,7 @@ export const AuthForms = ({ view, setCurrentView }: AuthFormsProps) => {
           {/* Left Side - Branding & Features */}
           <div className="text-center lg:text-left">
             <div className="flex items-center justify-center lg:justify-start space-x-3 mb-8">
-              <Calendar className="h-12 w-12 text-blue-600" />
+              <ReservaFacilIcon size={48} />
               <span className="text-4xl font-bold text-gray-900">ReservaFácil</span>
             </div>
             

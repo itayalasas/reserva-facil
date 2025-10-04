@@ -8,10 +8,11 @@ import { Business, Service, ClientInfo, TimeSlot, BusinessSchedule } from '../ty
 
 interface BookingProcessProps {
   business: Business;
+  preselectedService?: Service | null;
   setCurrentView: (view: string) => void;
 }
 
-export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps) => {
+export const BookingProcess = ({ business, preselectedService, setCurrentView }: BookingProcessProps) => {
   const { user, externalUser, isExternalAuth } = useAuth();
   const { notification, showSuccess, showError, hideNotification } = useNotification();
   const [currentStep, setCurrentStep] = useState(1);
@@ -44,7 +45,12 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
   useEffect(() => {
     fetchData();
     fetchPaymentConfig();
-    
+
+    // Si hay un servicio preseleccionado, establecerlo
+    if (preselectedService) {
+      setSelectedService(preselectedService);
+    }
+
     // Autocompletar datos del usuario autenticado
     if (isExternalAuth && externalUser) {
       setClientInfo({
@@ -120,7 +126,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
         .maybeSingle();
 
       setPaymentConfig(data);
-      console.log('Payment config loaded:', data); // Debug
     } catch (error) {
       console.error('Error fetching payment config:', error);
     }
@@ -286,7 +291,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
       // Crear un timestamp único para identificar esta reserva
       const timestamp = Date.now().toString();
 
-      console.log('Creating booking with timestamp:', timestamp);
 
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -303,8 +307,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
 
       if (error) throw error;
 
-      console.log('Booking created before payment:', bookingData);
-      console.log('Booking timestamp to use for payment:', timestamp);
 
       // Store the timestamp in component state for payment
       setBookingTimestamp(timestamp);
@@ -334,7 +336,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
 
       if (error) throw error;
 
-      console.log('Booking updated after payment:', { bookingId, status: newStatus });
       
       // Clean up stored booking ID
       localStorage.removeItem('pending_booking_id');
@@ -352,14 +353,8 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
     const paymentStatus = urlParams.get('payment');
     const externalReference = urlParams.get('external_reference');
     const pendingBookingId = localStorage.getItem('pending_booking_id');
-    
+
     if (paymentStatus && pendingBookingId) {
-      console.log('Processing payment callback in BookingProcess:', {
-        paymentStatus,
-        externalReference,
-        pendingBookingId
-      });
-      
       updateBookingAfterPayment(pendingBookingId, paymentStatus).then((success) => {
         if (success) {
           const statusText = paymentStatus === 'success' ? 'confirmada' : 
@@ -395,7 +390,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
       // Create booking first, then redirect to payment
       const timestamp = await createBookingBeforePayment();
       if (timestamp) {
-        console.log('Booking created with timestamp:', timestamp);
         setShowPayment(true);
       }
     } else {
@@ -431,7 +425,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
 
       if (error) throw error;
 
-      console.log('Booking created successfully:', bookingData);
 
       // Show success message and redirect
       showSuccess(
@@ -454,7 +447,6 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
   };
 
   const handlePaymentSuccess = async (paymentId: string) => {
-    console.log('Payment successful:', paymentId);
     setShowPayment(false);
     // Create booking with confirmed status after successful payment
     await createBooking('confirmed');
@@ -599,20 +591,30 @@ export const BookingProcess = ({ business, setCurrentView }: BookingProcessProps
               {/* Service Selection */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Elige un Servicio
+                  {preselectedService ? 'Servicio Seleccionado' : 'Elige un Servicio'}
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
-                  {services.map((service) => (
+                  {(preselectedService ? [preselectedService] : services).map((service) => (
                     <div
                       key={service.id}
-                      onClick={() => setSelectedService(service)}
-                      className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                        selectedService?.id === service.id
-                          ? 'border-blue-600 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                      onClick={() => !preselectedService && setSelectedService(service)}
+                      className={`p-4 border-2 rounded-xl transition-all ${
+                        preselectedService
+                          ? 'border-blue-600 bg-blue-50 cursor-default'
+                          : selectedService?.id === service.id
+                          ? 'border-blue-600 bg-blue-50 cursor-pointer'
+                          : 'border-gray-200 hover:border-gray-300 cursor-pointer'
                       }`}
                     >
-                      <h4 className="font-semibold text-gray-900 mb-2">{service.name}</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-gray-900">{service.name}</h4>
+                        {preselectedService && (
+                          <span className="flex items-center text-sm text-blue-600 font-medium">
+                            <Check className="h-4 w-4 mr-1" />
+                            Preseleccionado
+                          </span>
+                        )}
+                      </div>
                       <p className="text-gray-600 text-sm mb-3">{service.description}</p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
