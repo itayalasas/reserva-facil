@@ -1,33 +1,42 @@
 // Sistema de Autenticación de Terceros
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL;
-const APP_ID = import.meta.env.VITE_AUTH_APP_ID || 'app_9c0ffde2-fc7';
-const API_KEY = import.meta.env.VITE_AUTH_API_KEY || 'ak_development_cd9bac61b17b0a09f307afe54e93d40f';
+const APP_ID = import.meta.env.VITE_AUTH_APP_ID;
+const API_KEY = import.meta.env.VITE_AUTH_API_KEY;
 
-
-if (!AUTH_BASE_URL) {
-  
+// Validar que todas las variables requeridas estén configuradas
+if (!AUTH_BASE_URL || !APP_ID || !API_KEY) {
   const errorMessage = `
 🚨 AUTHENTICATION CONFIGURATION ERROR 🚨
 
-Missing required environment variable:
-❌ VITE_AUTH_BASE_URL is not set
+Missing required environment variables:
+${!AUTH_BASE_URL ? '❌ VITE_AUTH_BASE_URL is not set' : '✅ VITE_AUTH_BASE_URL is configured'}
+${!APP_ID ? '❌ VITE_AUTH_APP_ID is not set' : '✅ VITE_AUTH_APP_ID is configured'}
+${!API_KEY ? '❌ VITE_AUTH_API_KEY is not set' : '✅ VITE_AUTH_API_KEY is configured'}
 
 📋 TO FIX THIS:
 
 1. For LOCAL DEVELOPMENT:
    - Add to your .env file:
-     VITE_AUTH_BASE_URL=https://auth-center.abacusai.app
+     VITE_AUTH_BASE_URL=https://auth-systemv1.netlify.app
+     VITE_AUTH_APP_ID=your_app_id
+     VITE_AUTH_API_KEY=your_api_key
    - Restart your dev server (npm run dev)
 
 2. For DEPLOYMENT (Netlify):
    - Go to your Netlify dashboard
    - Site settings → Environment variables
-   - Add: VITE_AUTH_BASE_URL = https://auth-center.abacusai.app
+   - Add these three variables:
+     • VITE_AUTH_BASE_URL = https://auth-systemv1.netlify.app
+     • VITE_AUTH_APP_ID = your_app_id
+     • VITE_AUTH_API_KEY = your_api_key
    - Redeploy your application
 
-Current value: ${AUTH_BASE_URL || 'undefined'}
+Current values:
+  AUTH_BASE_URL: ${AUTH_BASE_URL || 'undefined'}
+  APP_ID: ${APP_ID || 'undefined'}
+  API_KEY: ${API_KEY ? '[CONFIGURED]' : 'undefined'}
   `;
-  
+
   throw new Error(errorMessage);
 }
 
