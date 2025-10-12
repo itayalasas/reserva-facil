@@ -1,10 +1,15 @@
 // External Authentication Service for AbacusAI
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL;
 const APP_ID = import.meta.env.VITE_AUTH_APP_ID || 'app_mg1rvnob8d0563aa3323fa8e';
+const API_KEY = import.meta.env.VITE_AUTH_API_KEY;
 const APP_CALLBACK_URL = window.location.origin + '/auth/callback';
 
 if (!AUTH_BASE_URL) {
   throw new Error('VITE_AUTH_BASE_URL environment variable is required');
+}
+
+if (!API_KEY) {
+  throw new Error('VITE_AUTH_API_KEY environment variable is required');
 }
 
 export interface ExternalAuthResponse {
@@ -27,7 +32,7 @@ export interface ExternalUser {
 // Redirect to external auth provider
 export const redirectToExternalAuth = (mode: 'login' | 'register' = 'login') => {
   const endpoint = mode === 'register' ? '/register' : '/auth';
-  const authUrl = `${AUTH_BASE_URL}${endpoint}?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(APP_CALLBACK_URL)}&mode=${mode}`;
+  const authUrl = `${AUTH_BASE_URL}${endpoint}?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(APP_CALLBACK_URL)}&api_key=${API_KEY}`;
   window.location.href = authUrl;
 };
 

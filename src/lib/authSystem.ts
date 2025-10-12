@@ -95,7 +95,7 @@ export const isTokenExpiringSoon = (authData: AuthData): boolean => {
 export const redirectToAuth = async (action: 'login' | 'register' = 'login') => {
   try {
     const endpoint = action === 'register' ? '/register' : '/auth';
-    const authUrl = `${AUTH_BASE_URL}${endpoint}?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}&mode=${action}`;
+    const authUrl = `${AUTH_BASE_URL}${endpoint}?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}&api_key=${API_KEY}`;
     window.location.href = authUrl;
 
   } catch (error) {
